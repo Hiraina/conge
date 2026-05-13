@@ -30,8 +30,8 @@
 # DATABASE
 #--------------------------------------------------------------------
 
-# database.default.hostname = localhost
-# database.default.database = ci4
+database.default.DBDriver = SQLite3
+database.default.DBFilename = WRITEPATH . '/database.db'
 # database.default.username = root
 # database.default.password = root
 # database.default.DBDriver = MySQLi
