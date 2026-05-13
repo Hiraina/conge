@@ -1,0 +1,63 @@
+-- Activer les clés étrangères (bonne pratique)
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE departements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    description TEXT
+);
+
+CREATE TABLE types_conge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    libelle TEXT NOT NULL,
+    jours_annuels INTEGER DEFAULT 0,
+    deductible INTEGER DEFAULT 1  
+);
+
+CREATE TABLE employes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    prenom TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,      
+    role TEXT NOT NULL CHECK (role IN ('employe', 'rh', 'admin')),
+    departement_id INTEGER,
+    date_embauche DATE,
+    actif INTEGER DEFAULT 1,     -- 1 = actif, 0 = désactivé
+    FOREIGN KEY (departement_id) REFERENCES departements(id) ON DELETE RESTRICT
+);
+
+ 
+CREATE TABLE soldes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    type_conge_id INTEGER NOT NULL,
+    annee INTEGER NOT NULL,       
+    jours_attribues INTEGER NOT NULL,
+    jours_pris INTEGER DEFAULT 0,
+    FOREIGN KEY (employee_id) REFERENCES employes(id) ON DELETE CASCADE,
+    FOREIGN KEY (type_conge_id) REFERENCES types_conge(id) ON DELETE RESTRICT,
+    UNIQUE(employee_id, type_conge_id, annee)   -- un seul solde par (employé, type, année)
+);
+
+
+CREATE TABLE conges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    type_conge_id INTEGER NOT NULL,
+    date_debut DATE NOT NULL,
+    date_fin DATE NOT NULL,
+    nb_jours INTEGER NOT NULL,    
+    motif TEXT,
+    statut TEXT NOT NULL CHECK (statut IN ('en_attente', 'approuvee', 'refusee', 'annulee')),
+    commentaire_rrh TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    traite_par INTEGER,         
+    FOREIGN KEY (employee_id) REFERENCES employes(id),
+    FOREIGN KEY (type_conge_id) REFERENCES types_conge(id),
+    FOREIGN KEY (traite_par) REFERENCES employes(id)
+);
+
+-- Créer un index pour accélérer les recherches
+CREATE INDEX idx_conges_employe ON conges(employee_id);
+CREATE INDEX idx_conges_statut ON conges(statut);
