@@ -1,176 +1,207 @@
-ÉTAPE 1 — Création du projet
-👤 A
+# Checklist du projet – Système RH TechMada (CI4 + SQLite)
 
-Crée le projet CI4 :
+## Répartition des rôles
 
-composer create-project codeigniter4/appstarter gestion-conges
+| Élève | Responsabilités principales |
+|-------|----------------------------|
+| **A** | Setup initial, Authentification, Espace employé (complet), Profil utilisateur |
+| **B** | Migrations/Seeders, Espace RH, Espace admin, Logique métier transverse, Finitions |
 
-Configure :
+---
 
-.env
-URL du projet
-connexion DB
-👤 B
+## 1. Mise en place et organisation
 
-Pendant ce temps :
-Prépare déjà le schéma de la BDD sur papier/notes :
+### Tâches communes
+- [ ] S’assurer que le dossier `writable/` est accessible en écriture
+- [ ] S’accorder sur les conventions de code (PSR-12, nommage des routes, etc.)
+- [ ] Créer le dépôt Git partagé et ajouter les deux membres
 
-Tables :
+### 👤 Élève A
+- [ ] Créer le projet CI4 : `composer create-project codeigniter4/appstarter gestion-conges`
+- [ ] Configurer le fichier `.env` (URL du projet, connexion DB SQLite)
+- [ ] Initialiser Git : `git init`, `git add .`, `git commit -m "Initial commit"`
+- [ ] Pousser le projet sur GitHub/GitLab
+- [ ] Créer et partager le lien du repo avec l'élève B
 
-departements
-employes
-types_conge
-soldes
-conges
+### 👤 Élève B
+- [ ] Cloner le projet : `git clone <url>`
+- [ ] Créer sa branche de travail : `git checkout -b dev-bdd`
+- [ ] Préparer le schéma BDD sur papier/notes (colonnes, relations, contraintes)
+- [ ] Réfléchir à la logique métier (solde calculé, déduction à l'approbation)
 
-Réfléchit aux colonnes.
+---
 
-Exemple :
+## 2. Base de données – Migrations & Seeders
 
-employes:
-id
-nom
-email
-password
-role
-departement_id
-ÉTAPE 2 — Git
-👤 A
+### 👤 Élève B (responsable)
+- [ ] Créer les 5 migrations dans l'ordre :
+  - `departements`
+  - `types_conge`
+  - `employes`
+  - `soldes`
+  - `conges`
+- [ ] Définir les contraintes :
+  - `employes.email` UNIQUE
+  - `employes.role` CHECK (role IN ('employe', 'rh', 'admin'))
+  - `conges.statut` CHECK (statut IN ('en_attente', 'approuvee', 'refusee', 'annulee'))
+  - Clés étrangères avec `ON DELETE RESTRICT` ou `CASCADE`
+- [ ] Rédiger le seeder (`DatabaseSeeder.php`) avec :
+  - 1 admin, 2 employés, 1 responsable RH
+  - 3 types de congés (Congés payés, RTT, Sans solde)
+  - Soldes initialisés (année courante, jours_attribues, jours_pris = 0)
+- [ ] Exécuter `php spark migrate` et `php spark db:seed`
+- [ ] Vérifier que le fichier `writable/database.db` est créé
 
-Initialise Git :
+### 👤 Élève A (en parallèle)
+- [ ] Pendant que B fait les migrations, préparer la structure des contrôleurs
+- [ ] Noter les routes nécessaires pour l'authentification
 
-git init
-git add .
-git commit -m "Initial commit"
+---
 
-Crée le repo GitHub/GitLab.
+## 3. Authentification & contrôle d’accès (40 min)
 
-👤 B
+### 👤 Élève A (responsable)
+- [ ] Créer le **filtre personnalisé `AuthFilter`** : vérifier session + rôle
+- [ ] Configurer les **routes protégées par groupe** : `/employee/*`, `/rh/*`, `/admin/*`
+- [ ] Créer le **contrôleur `AuthController`** : login, logout, formulaire avec CSRF
+- [ ] Implémenter les **mots de passe hashés avec `password_hash()`**
+- [ ] Ajouter la **vérification du rôle dans chaque contrôleur** (redirection si mauvais rôle)
+- [ ] Créer le **layout partagé** (`app.php`) avec sidebar dynamique selon rôle
+- [ ] Ajouter les messages **flashdata** pour succès/erreur de connexion
 
-Clone le projet :
+### 👤 Élève B (en parallèle)
+- [ ] Préparer les modèles (voir étape 4)
+- [ ] Ajouter les relations et méthodes utiles dans les modèles
 
-git clone ...
+---
 
-Puis crée sa branche :
+## 4. Modèles & méthodes métier (préparatoire)
 
-git checkout -b dev-bdd
-ÉTAPE 3 — Migrations
-👤 B
+### 👤 Élève B
+- [ ] Créer les modèles :
+  - `EmployeModel`
+  - `DepartementModel`
+  - `TypeCongeModel`
+  - `SoldeModel`
+  - `CongeModel`
+- [ ] Configurer `$table` et `$allowedFields` pour chaque modèle
+- [ ] Ajouter les méthodes utiles dans les modèles :
+  - `getSoldeRestant($employe_id, $type_conge_id, $annee)`
+  - `verifierSoldeSuffisant($employe_id, $type_conge_id, $annee, $nb_jours)`
+  - `deduireSolde($employe_id, $type_conge_id, $annee, $nb_jours)`
+  - `recrediterSolde($employe_id, $type_conge_id, $annee, $nb_jours)`
+  - `verifierChevauchement($employe_id, $date_debut, $date_fin)`
+  - `calculerNbJours($date_debut, $date_fin)`
 
-Commence les migrations :
+### 👤 Élève A (en parallèle)
+- [ ] Tester l’authentification avec les comptes créés par B
+- [ ] Vérifier que les sessions fonctionnent correctement
 
-php spark make:migration CreateEmployesTable
+---
 
-Puis crée :
+## 5. Espace Employé (60 min)
 
-departements
-types_conge
-employes
-soldes
-conges
+### 👤 Élève A (responsable)
+- [ ] **Tableau de bord employé** : afficher le solde restant par type de congé
+- [ ] **Formulaire de soumission de demande** (type, dates, motif) avec validation CI4
+  - [ ] Vérifier `date_debut <= date_fin`
+  - [ ] Vérifier l’absence de chevauchement (utiliser la méthode du modèle)
+  - [ ] Vérifier le solde suffisant (alerte, pas de débit)
+  - [ ] Calculer le nombre de jours
+- [ ] **Enregistrement** de la demande (`statut = 'en_attente'`)
+- [ ] **Liste des propres demandes** avec statuts
+- [ ] **Annulation d’une demande** (seulement si `statut = 'en_attente'`)
+- [ ] **Modification du profil** (nom, mot de passe)
+- [ ] Tester : un employé ne peut pas voir les demandes des autres
 
-Ensuite :
+### 👤 Élève B (code review)
+- [ ] Relire le code de l’espace employé
+- [ ] Vérifier les appels aux modèles (méthodes métier)
 
-php spark migrate
-👤 A
-Pendant ce temps :
+---
 
-Crée :
+## 6. Espace Responsable RH (50 min)
 
-AuthController
-vues login
-routes login/logout
+### 👤 Élève B (responsable)
+- [ ] **Liste de toutes les demandes en attente** (avec filtre par département)
+- [ ] **Détail d’une demande** : boutons Approuver / Refuser + commentaire optionnel
+- [ ] **Logique d’approbation** (cœur métier) :
+  - [ ] Vérifier à nouveau le solde suffisant
+  - [ ] Mettre à jour `soldes.jours_pris = jours_pris + nb_jours`
+  - [ ] Changer le statut en `approuvee`
+- [ ] **Logique de refus** : statut `refusee`, pas de changement dans soldes
+- [ ] **Annulation après approbation** : recréditer le solde si une demande approuvée est annulée
+- [ ] **Filtre sur les demandes** (par statut, par département)
+- [ ] **Consultation du solde de chaque employé** (lecture seule)
+- [ ] Tester : solde insuffisant → refus avec message ; approbation → solde déduit
 
-Exemple :
+### 👤 Élève A (code review)
+- [ ] Relire le code RH
+- [ ] Vérifier la cohérence avec l’espace employé
 
-GET /login
-POST /login
-GET /logout
-ÉTAPE 4 — Modèles & Auth
-👤 B
+---
 
-Crée les modèles :
+## 7. Espace Administrateur (30 min)
 
-php spark make:model EmployeModel
+### 👤 Élève B (responsable)
+- [ ] **CRUD des employés** (créer, modifier, désactiver → `actif = 0`)
+- [ ] **CRUD des départements** (nom, description)
+- [ ] **CRUD des types de congés** (libelle, jours_annuels, deductible)
+- [ ] **Tableau de bord admin** : absences du mois en cours (demandes approuvées)
+- [ ] **Initialiser / ajuster le solde annuel** d’un employé
+- [ ] **Historique complet** de toutes les demandes (paginé, triable)
 
-etc.
+### 👤 Élève A (code review)
+- [ ] Relire le code admin
+- [ ] Vérifier les permissions (seul l’admin accède)
 
-Puis configure :
+---
 
-$table
-$allowedFields
-👤 A
+## 8. Logique métier transverse – Points obligatoires (vérification commune)
 
-Pendant ce temps :
+- [ ] **Le solde n’est déduit qu’à l’approbation** (pas à la soumission)
+- [ ] **Annulation après approbation** : recréditer le solde
+- [ ] **Refus après approbation** : recréditer le solde
+- [ ] **Empêcher les chevauchements** : pas deux demandes actives sur les mêmes dates
+- [ ] **Empêcher la soumission si solde insuffisant**
+- [ ] **Bloquer les dates invalides** (`date_debut > date_fin`)
 
-Code :
+---
 
-formulaire login
-récupération email/password
-session utilisateur
+## 9. Tests et validation (binôme ensemble)
 
-Exemple :
-ession()->set(...)
-ÉTAPE 5 — Seeders
-👤 B
+- [ ] Tester le workflow complet :
+  - Employé soumet → RH approuve → solde mis à jour
+  - Employé soumet → RH refuse → solde inchangé
+  - Employé annule avant approbation → solde inchangé
+- [ ] Tester les permissions : URL directe par employé → redirection
+- [ ] Vérifier CSRF sur tous les formulaires POST
+- [ ] Vérifier `redirect()` après chaque POST (Pattern PRG)
+- [ ] Vérifier les messages flashdata
 
-Crée les données de test :
+---
 
-php spark make:seeder UserSeeder
+## 10. Finitions & livrables (20 min)
 
-Ajoute :
+### 👤 Élève A
+- [ ] Rendre le code propre (indentation, pas de `var_dump`)
+- [ ] Vérifier les fonctionnalités employé (4 points)
 
-admin
-RH
-employés
-types de congés
-Puis :
+### 👤 Élève B
+- [ ] Rédiger le `README.md` avec :
+  - Instructions d’installation
+  - Comptes de test
+- [ ] Vérifier les fonctionnalités RH (3 points) et admin (3 points)
 
-php spark db:seed UserSeeder
-👤 A
+### 👤 A et B ensemble
+- [ ] Fusionner la branche finale : `git checkout main`, `git merge dev-bdd`
+- [ ] Tagger `v1.0` : `git tag -a v1.0 -m "Version finale du projet"`
+- [ ] Déposer le projet (lien Git ou archive)
 
-Pendant ce temps :
+---
 
-Teste l’auth avec les comptes créés.
+## 11. Bonus (si temps)
 
-Exemple :
-
-admin@test.com
-1234
-ÉTAPE 6 — Rôles & sécurité
-👤 A
-
-Crée les filters :
-
-php spark make:filter AdminFilter
-
-Puis :
-
-AdminFilter
-RhFilter
-EmployeFilter
-
-Configure :
-app/Config/Filters.php
-👤 B
-
-Pendant ce temps :
-
-Ajoute dans les modèles :
-
-relations utiles
-méthodes utiles
-
-Exemple :
-
-getSoldeByEmploye()
-ÉTAPE 7 — Fusion
-👤 A et B
-
-Quand tout marche :
-
-git add .
-git commit -m "Auth + BDD done"
-git push
-
-Puis merge.
+- [ ] Export CSV des demandes (RH ou admin) – 👤 B
+- [ ] Graphique simple sur dashboard admin (stats par mois) – 👤 B
+- [ ] Notification email lors d’une validation – 👤 A ou B
